@@ -35,7 +35,6 @@ func main() {
 	// Initialize sqlc queries.
 	queries := database.New(pool)
 	productHandler := handlers.NewProductHandler(queries)
-	_ = queries // We'll use these queries when we build product handlers.
 
 	// Configure the HTTP router.
 	r := chi.NewRouter()
@@ -49,6 +48,18 @@ func main() {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "Welcome to TETER Product Inventory API!")
 	})
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+    ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+    defer cancel()
+
+    if err := pool.Ping(ctx); err != nil {
+        http.Error(w, "Database unavailable", http.StatusServiceUnavailable)
+        return
+    }
+
+    w.WriteHeader(http.StatusOK)
+    fmt.Fprintln(w, "OK")
+})
 	r.Post("/api/v1/products", productHandler.CreateProduct)
 	r.Get("/api/v1/products", productHandler.ListProducts)
 	r.Get("/api/v1/products/{id}", productHandler.GetProductByID)

@@ -14,10 +14,26 @@ import (
 const countProducts = `-- name: CountProducts :one
 SELECT COUNT(*)
 FROM products
+WHERE
+    ($1::varchar = '' OR status = $1::varchar)
+    AND (
+        $2::text = ''
+        OR name ILIKE '%' || $2::text || '%'
+    )
+    AND (
+        NOT $3::boolean
+        OR stock_quantity <= 5
+    )
 `
 
-func (q *Queries) CountProducts(ctx context.Context) (int64, error) {
-	row := q.db.QueryRow(ctx, countProducts)
+type CountProductsParams struct {
+	Status   string `json:"status"`
+	Search   string `json:"search"`
+	LowStock bool   `json:"low_stock"`
+}
+
+func (q *Queries) CountProducts(ctx context.Context, arg CountProductsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countProducts, arg.Status, arg.Search, arg.LowStock)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -32,14 +48,7 @@ INSERT INTO products (
     stock_quantity,
     status
 )
-VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6
-)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING id, name, sku, description, price, stock_quantity, status, created_at, updated_at
 `
 
@@ -137,18 +146,37 @@ func (q *Queries) GetProductBySKU(ctx context.Context, sku string) (Product, err
 const listProducts = `-- name: ListProducts :many
 SELECT id, name, sku, description, price, stock_quantity, status, created_at, updated_at
 FROM products
+WHERE
+    ($1::varchar = '' OR status = $1::varchar)
+    AND (
+        $2::text = ''
+        OR name ILIKE '%' || $2::text || '%'
+    )
+    AND (
+        NOT $3::boolean
+        OR stock_quantity <= 5
+    )
 ORDER BY id DESC
-LIMIT $1
-OFFSET $2
+LIMIT $5::integer
+OFFSET $4::integer
 `
 
 type ListProductsParams struct {
-	Limit  int32 `json:"limit"`
-	Offset int32 `json:"offset"`
+	Status     string `json:"status"`
+	Search     string `json:"search"`
+	LowStock   bool   `json:"low_stock"`
+	PageOffset int32  `json:"page_offset"`
+	PageSize   int32  `json:"page_size"`
 }
 
 func (q *Queries) ListProducts(ctx context.Context, arg ListProductsParams) ([]Product, error) {
-	rows, err := q.db.Query(ctx, listProducts, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listProducts,
+		arg.Status,
+		arg.Search,
+		arg.LowStock,
+		arg.PageOffset,
+		arg.PageSize,
+	)
 	if err != nil {
 		return nil, err
 	}

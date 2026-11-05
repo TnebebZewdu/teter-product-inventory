@@ -3,29 +3,30 @@ FROM golang:1.27-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependency files first
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the project source code
 COPY . .
 
-# Build the API executable
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-s -w" \
+    -o /app/api ./cmd/api
 
-# Stage 2: Run the application
+
+# Stage 2: Create the production image
 FROM alpine:latest
 
 WORKDIR /app
 
-# Install certificates for secure connections
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates \
+    && addgroup -S appgroup \
+    && adduser -S appuser -G appgroup
 
-# Copy the executable from the builder stage
-COPY --from=builder /app/api .
+COPY --from=builder --chown=appuser:appgroup /app/api .
 
-# Expose the API port
+# Run the application without root privileges
+USER appuser
+
 EXPOSE 8080
 
-# Start the API
 CMD ["./api"]

@@ -77,7 +77,7 @@ VALUES
         '24-inch Full HD computer monitor',
         180.00,
         6,
-        'active'
+        'archived'
     ),
     (
         'Laptop Backpack',
@@ -87,4 +87,10 @@ VALUES
         0,
         'draft'
     )
-ON CONFLICT (sku) DO NOTHING;
+ON CONFLICT (sku) DO UPDATE SET
+    name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    price = EXCLUDED.price,
+    stock_quantity = EXCLUDED.stock_quantity,
+    status = EXCLUDED.status,
+    updated_at = NOW();
