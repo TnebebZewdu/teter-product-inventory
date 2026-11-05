@@ -8,12 +8,13 @@ import (
 
 // MockDatabase provides fake database methods for handler tests.
 type MockDatabase struct {
-	Products         []database.Product
-	CreatedProduct   database.Product
-	ProductByID database.Product
-	Total            int64
-	Err              error
-	CreateProductErr error
+	Products            []database.Product
+	CreatedProduct      database.Product
+	CreateProductParams database.CreateProductParams
+	ProductByID         database.Product
+	Total               int64
+	Err                 error
+	CreateProductErr    error
 }
 
 func (m *MockDatabase) CountProducts(
@@ -30,6 +31,8 @@ func (m *MockDatabase) CreateProduct(
 	ctx context.Context,
 	arg database.CreateProductParams,
 ) (database.Product, error) {
+	m.CreateProductParams = arg
+
 	if m.CreateProductErr != nil {
 		return database.Product{}, m.CreateProductErr
 	}
@@ -40,21 +43,20 @@ func (m *MockDatabase) CreateProduct(
 }
 
 func (m *MockDatabase) DeleteProduct(
-    ctx context.Context,
-    id int64,
+	ctx context.Context,
+	id int64,
 ) error {
-    return m.Err
+	return m.Err
 }
 
 func (m *MockDatabase) GetProductByID(
-    ctx context.Context,
-    id int64,
+	ctx context.Context,
+	id int64,
 ) (database.Product, error) {
-    if m.Err != nil {
-        return database.Product{}, m.Err
-    }
-
-    return m.CreatedProduct, nil
+	if m.Err != nil {
+		return database.Product{}, m.Err
+	}
+	return m.CreatedProduct, nil
 }
 
 func (m *MockDatabase) GetProductBySKU(
@@ -78,14 +80,13 @@ func (m *MockDatabase) ListProducts(
 }
 
 func (m *MockDatabase) UpdateProduct(
-    ctx context.Context,
-    arg database.UpdateProductParams,
+	ctx context.Context,
+	arg database.UpdateProductParams,
 ) (database.Product, error) {
-    if m.Err != nil {
-        return database.Product{}, m.Err
-    }
-
-    return m.CreatedProduct, nil
+	if m.Err != nil {
+		return database.Product{}, m.Err
+	}
+	return m.CreatedProduct, nil
 }
 
 // Verify that MockDatabase implements the required interface.

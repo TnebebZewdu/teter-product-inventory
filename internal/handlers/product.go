@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +18,8 @@ import (
 
 	"github.com/TnebebZewdu/teter-product-inventory/internal/database"
 )
+
+var skuPattern = regexp.MustCompile(`^[A-Z0-9]+(-[A-Z0-9]+)*$`)
 
 // ProductHandler handles product-related HTTP requests.
 type ProductHandler struct {
@@ -179,11 +182,17 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.TrimSpace(request.SKU) == "" {
+	sku := strings.TrimSpace(request.SKU)
+
+	if sku == "" {
 		writeError(w, http.StatusBadRequest, "Product SKU is required")
 		return
 	}
 
+	if !skuPattern.MatchString(sku) {
+		writeError(w, http.StatusBadRequest, "SKU must contain only uppercase letters, numbers, and optional hyphens")
+		return
+	}
 	price, err := parsePrice(request.Price)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -193,6 +202,10 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	if request.StockQuantity < 0 {
 		writeError(w, http.StatusBadRequest, "Stock quantity cannot be negative")
 		return
+	}
+
+	if strings.TrimSpace(request.Status) == "" {
+		request.Status = "draft"
 	}
 
 	if !isValidStatus(request.Status) {
@@ -207,7 +220,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 
 	product, err := h.queries.CreateProduct(r.Context(), database.CreateProductParams{
 		Name:          strings.TrimSpace(request.Name),
-		Sku:           strings.TrimSpace(request.SKU),
+		Sku:           sku,
 		Description:   description,
 		Price:         price,
 		StockQuantity: request.StockQuantity,
@@ -335,8 +348,15 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.TrimSpace(request.SKU) == "" {
+	sku := strings.TrimSpace(request.SKU)
+
+	if sku == "" {
 		writeError(w, http.StatusBadRequest, "Product SKU is required")
+		return
+	}
+
+	if !skuPattern.MatchString(sku) {
+		writeError(w, http.StatusBadRequest, "SKU must contain uppercase letters or numbers separated by hyphens")
 		return
 	}
 
@@ -363,7 +383,7 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 	product, err := h.queries.UpdateProduct(r.Context(), database.UpdateProductParams{
 		Name:          strings.TrimSpace(request.Name),
-		Sku:           strings.TrimSpace(request.SKU),
+		Sku:           sku,
 		Description:   description,
 		Price:         price,
 		StockQuantity: request.StockQuantity,

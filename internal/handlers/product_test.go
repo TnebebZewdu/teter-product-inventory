@@ -311,6 +311,40 @@ func TestCreateProductInvalidName(t *testing.T) {
 		)
 	}
 }
+func TestCreateProductInvalidSKU(t *testing.T) {
+	mockDB := &MockDatabase{}
+	handler := NewProductHandler(mockDB)
+
+	router := chi.NewRouter()
+	router.Post("/products", handler.CreateProduct)
+
+	body := `{
+		"name": "Wireless Mouse",
+		"sku": "mouse-001",
+		"description": "Wireless computer mouse",
+		"price": 25.50,
+		"stock_quantity": 10,
+		"status": "active"
+	}`
+
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/products",
+		strings.NewReader(body),
+	)
+	request.Header.Set("Content-Type", "application/json")
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Errorf(
+			"expected status %d, got %d",
+			http.StatusBadRequest,
+			recorder.Code,
+		)
+	}
+}
 func TestCreateProductInvalidJSON(t *testing.T) {
 	mockDB := &MockDatabase{}
 	handler := NewProductHandler(mockDB)
@@ -380,6 +414,55 @@ func TestCreateProductSuccess(t *testing.T) {
 
 	if !strings.Contains(recorder.Body.String(), "Wireless Mouse") {
 		t.Errorf("expected response to contain the created product")
+	}
+}
+
+func TestCreateProductDefaultsStatusToDraft(t *testing.T) {
+	mockDB := &MockDatabase{
+		CreatedProduct: database.Product{
+			ID:     1,
+			Name:   "Wireless Mouse",
+			Sku:    "MOUSE-003",
+			Status: "draft",
+		},
+	}
+	handler := NewProductHandler(mockDB)
+
+	router := chi.NewRouter()
+	router.Post("/products", handler.CreateProduct)
+
+	body := `{
+        "name": "Wireless Mouse",
+        "sku": "MOUSE-003",
+        "description": "Wireless computer mouse",
+        "price": 25.50,
+        "stock_quantity": 10
+    }`
+
+	request := httptest.NewRequest(
+		http.MethodPost,
+		"/products",
+		strings.NewReader(body),
+	)
+	request.Header.Set("Content-Type", "application/json")
+
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf(
+			"expected status %d, got %d: %s",
+			http.StatusCreated,
+			recorder.Code,
+			recorder.Body.String(),
+		)
+	}
+
+	if mockDB.CreateProductParams.Status != "draft" {
+		t.Errorf(
+			"expected database status 'draft', got %q",
+			mockDB.CreateProductParams.Status,
+		)
 	}
 }
 func TestGetProductByIDSuccess(t *testing.T) {
