@@ -1,4 +1,3 @@
-
 package handlers
 
 import (
@@ -21,19 +20,20 @@ import (
 
 // ProductHandler handles product-related HTTP requests.
 type ProductHandler struct {
-    queries database.Querier
+	queries database.Querier
 }
 
 func NewProductHandler(queries database.Querier) *ProductHandler {
-    return &ProductHandler{queries: queries}
+	return &ProductHandler{queries: queries}
 }
+
 type ProductRequest struct {
-	Name          string  `json:"name"`
-	SKU           string  `json:"sku"`
-	Description   *string `json:"description"`
-	Price         string  `json:"price"`
-	StockQuantity int32   `json:"stock_quantity"`
-	Status        string  `json:"status"`
+	Name          string      `json:"name"`
+	SKU           string      `json:"sku"`
+	Description   *string     `json:"description"`
+	Price         json.Number `json:"price"`
+	StockQuantity int32       `json:"stock_quantity"`
+	Status        string      `json:"status"`
 }
 
 func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
@@ -43,37 +43,37 @@ func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 }
 
 func writeError(w http.ResponseWriter, statusCode int, message string) {
-    code := "INTERNAL_SERVER_ERROR"
+	code := "INTERNAL_SERVER_ERROR"
 
-    switch statusCode {
-    case http.StatusBadRequest:
-        code = "BAD_REQUEST"
-    case http.StatusNotFound:
-        code = "NOT_FOUND"
-    case http.StatusConflict:
-        code = "CONFLICT"
-    case http.StatusInternalServerError:
-        code = "INTERNAL_SERVER_ERROR"
-    }
+	switch statusCode {
+	case http.StatusBadRequest:
+		code = "BAD_REQUEST"
+	case http.StatusNotFound:
+		code = "NOT_FOUND"
+	case http.StatusConflict:
+		code = "CONFLICT"
+	case http.StatusInternalServerError:
+		code = "INTERNAL_SERVER_ERROR"
+	}
 
-    writeJSON(w, statusCode, map[string]interface{}{
-        "error": map[string]string{
-            "code":    code,
-            "message": message,
-        },
-    })
+	writeJSON(w, statusCode, map[string]interface{}{
+		"error": map[string]string{
+			"code":    code,
+			"message": message,
+		},
+	})
 }
 
 type productResponse struct {
-	ID            int64   `json:"id"`
-	Name          string  `json:"name"`
-	SKU           string  `json:"sku"`
-	Description   *string `json:"description"`
-	Price         string  `json:"price"`
-	StockQuantity int32   `json:"stock_quantity"`
-	Status        string  `json:"status"`
-	CreatedAt     string  `json:"created_at"`
-	UpdatedAt     string  `json:"updated_at"`
+	ID            int64       `json:"id"`
+	Name          string      `json:"name"`
+	SKU           string      `json:"sku"`
+	Description   *string     `json:"description"`
+	Price         json.Number `json:"price"`
+	StockQuantity int32       `json:"stock_quantity"`
+	Status        string      `json:"status"`
+	CreatedAt     string      `json:"created_at"`
+	UpdatedAt     string      `json:"updated_at"`
 }
 
 func toProductResponse(product database.Product) productResponse {
@@ -84,7 +84,7 @@ func toProductResponse(product database.Product) productResponse {
 	}
 
 	price, err := product.Price.Value()
-	if err != nil {
+	if err != nil || price == nil {
 		price = "0"
 	}
 
@@ -93,7 +93,7 @@ func toProductResponse(product database.Product) productResponse {
 		Name:          product.Name,
 		SKU:           product.Sku,
 		Description:   description,
-		Price:         fmt.Sprint(price),
+		Price:         json.Number(fmt.Sprint(price)),
 		StockQuantity: product.StockQuantity,
 		Status:        product.Status,
 		CreatedAt:     product.CreatedAt.Time.Format(time.RFC3339),
@@ -133,10 +133,11 @@ func (h *ProductHandler) GetProductByID(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, toProductResponse(product))
 }
 
-func parsePrice(value string) (pgtype.Numeric, error) {
+func parsePrice(value json.Number) (pgtype.Numeric, error) {
+	priceValue := value.String()
 	var price pgtype.Numeric
 
-	if err := price.Scan(value); err != nil {
+	if err := price.Scan(priceValue); err != nil {
 		return pgtype.Numeric{}, fmt.Errorf("invalid price")
 	}
 
@@ -149,7 +150,7 @@ func parsePrice(value string) (pgtype.Numeric, error) {
 	}
 
 	decimal := new(big.Rat)
-	if _, ok := decimal.SetString(value); !ok {
+	if _, ok := decimal.SetString(priceValue); !ok {
 		return pgtype.Numeric{}, fmt.Errorf("invalid price")
 	}
 
